@@ -37,7 +37,7 @@ public class SortedSequencesIterator {
         // Check border case again: empty iterators list
         if (iterators.isEmpty()) return Collections.emptyIterator();
 
-        // Group iterators list by their first element
+        // Group iterators by their first element
         // (We need a multimap because there can be
         // duplicated elements among different iterators)
         TreeMap<T, List<Iterator<T>>> nextPerSequence = iterators.stream()
