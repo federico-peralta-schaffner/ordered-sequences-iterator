@@ -1,6 +1,7 @@
 package fps;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class SortedSequencesIterator {
@@ -21,28 +22,53 @@ public class SortedSequencesIterator {
 
         if (input.isEmpty()) return Collections.emptyIterator();
 
-        List<Iterable<T>> iterables = input.stream()
-                .map(it -> Objects.requireNonNull(it, "input elements cannot be null"))
-                .filter(it -> it.iterator().hasNext())
+        List<Iterator<T>> iterators = input.stream()
+                .map(it -> Objects.requireNonNull(it, "input sequences cannot be null"))
+                .map(Iterable::iterator)
+                .filter(Iterator::hasNext)
                 .collect(Collectors.toList());
 
-        if (iterables.isEmpty()) return Collections.emptyIterator();
+        if (iterators.isEmpty()) return Collections.emptyIterator();
 
-        PriorityQueue<T> pq = new PriorityQueue<>(iterables.size());
+        TreeMap<T, List<Iterator<T>>> nextPerSequence = iterators.stream()
+                .collect(Collectors.groupingBy(
+                        Iterator::next,
+                        TreeMap::new,
+                        Collectors.mapping(
+                                Function.identity(),
+                                Collectors.toCollection(ArrayList::new))));
 
-        iterables.forEach(it -> pq.offer(it.iterator().next()));
+        class Box {
+            Iterator<T> it;
+        }
+        Box box = new Box();
 
         return new Iterator<>() {
+
             @Override
             public boolean hasNext() {
-                return !pq.isEmpty();
+                return !nextPerSequence.isEmpty();
             }
 
             @Override
             public T next() {
-                T elem = pq.poll();
+                // Get min element
+                T min = nextPerSequence.firstKey();
 
-                return elem;
+                if (min == null) throw new NoSuchElementException();
+
+                nextPerSequence.computeIfPresent(min, (k, its) -> {
+                    box.it = its.remove(0);
+                    return its.isEmpty() ? null : its;
+                });
+
+                Iterator<T> sequenceIterator = box.it;
+                if (sequenceIterator.hasNext()) {
+                    nextPerSequence.computeIfAbsent(sequenceIterator.next(), k -> new ArrayList<>())
+                            .add(sequenceIterator);
+                }
+
+                return min;
             }
         };
     }
