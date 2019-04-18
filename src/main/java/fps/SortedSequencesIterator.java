@@ -1,7 +1,6 @@
 package fps;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class SortedSequencesIterator {
@@ -37,20 +36,21 @@ public class SortedSequencesIterator {
         // Check border case again: empty iterators list
         if (iterators.isEmpty()) return Collections.emptyIterator();
 
-        // Group iterators by their first element
-        // (We need a multimap because there can be
-        // duplicated elements among different iterators)
-        TreeMap<T, List<Iterator<T>>> nextPerSequence = iterators.stream()
-                .collect(Collectors.groupingBy(
-                        Iterator::next,
-                        TreeMap::new,
-                        Collectors.mapping(
-                                Function.identity(),
-                                Collectors.toCollection(ArrayList::new))));
+        // Helper PairBox class that links each iterator to its next element
+        class PairBox {
+            final T elem;
+            final Iterator<T> it;
 
-        // Helper Box class
-        class Box { Iterator<T> it; }
-        Box box = new Box();
+            PairBox(T elem, Iterator<T> it) {
+                this.elem = elem;
+                this.it = it;
+            }
+        }
+
+        // Insert each iterator along with its first element into a
+        // priority queue that sorts elements by each iterator's next element
+        PriorityQueue<PairBox> nextPerSequence = new PriorityQueue<>(Comparator.comparing(p -> p.elem));
+        iterators.forEach(it -> nextPerSequence.add(new PairBox(it.next(), it)));
 
         // Iterator to be returned
         return new Iterator<>() {
@@ -62,26 +62,17 @@ public class SortedSequencesIterator {
 
             @Override
             public T next() {
-                // Get min element from iterators map
-                T min = nextPerSequence.firstKey();
+                // Remove min element from priority queue
+                PairBox min = nextPerSequence.poll();
 
                 if (min == null) throw new NoSuchElementException();
 
-                // Remove min element's entry and keep a reference to its iterator
-                nextPerSequence.computeIfPresent(min, (k, its) -> {
-                    box.it = its.remove(0);
-                    return its.isEmpty() ? null : its;
-                });
-
-                Iterator<T> sequenceIterator = box.it;
-
-                // Add next element from min element's iterator
-                if (sequenceIterator.hasNext()) {
-                    nextPerSequence.computeIfAbsent(sequenceIterator.next(), k -> new ArrayList<>())
-                            .add(sequenceIterator);
+                // Add next element from min element's iterator to priority queue
+                if (min.it.hasNext()) {
+                    nextPerSequence.add(new PairBox(min.it.next(), min.it));
                 }
 
-                return min;
+                return min.elem;
             }
         };
     }
